@@ -56,12 +56,15 @@ class SimHost{
 	 */
 	Buffer<ByteArray> nl2dll;
 	
+	
+	public String deviceId;
 	/**
 	 * reads configurations of end devices; and connections among end devices, routers and switches
 	 *
 	 * @param deviceId string representation of the device, Hn for end devices, Rn for routers, Sn for switches; n being 1,2,3,...
 	 */
-	public void loadParameters(String deviceId) throws Exception{		
+	public void loadParameters(String deviceId) throws Exception{	
+		this.deviceId=deviceId;
 		BufferedReader br=new BufferedReader(new FileReader("Config//Config.txt"));		
 		String line;
 		while((line=br.readLine())!=null){

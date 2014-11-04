@@ -314,7 +314,7 @@ class SimRouter extends Thread {
 	 * @param deviceId
 	 *            device id of the router
 	 */
-	static GUIRouter gui = new GUIRouter("Router");
+	//static GUIRouter gui = new GUIRouter("Router");
 
 	public SimRouter(String deviceId) {
 		rMemory = new Buffer<ByteArray>("Router Memory", MEMORY_SIZE);
@@ -498,9 +498,9 @@ class SimRouter extends Thread {
 				ByteArray b = receivePacketsFromPorts();
 				String temps = "\tPacket received by routing engine";
 				System.out.println(temps);
-				gui.updateGUI(temps);
+				//gui.updateGUI(temps);
 				int interfaceId = b.getByteVal(0);
-				gui.updateGUI("int "+ interfaceId);
+				//gui.updateGUI("int "+ interfaceId);
 
 				Packet p = new Packet(b.getAt(1, b.getSize() - 1));
 				IpAddress dst = p.getDstIp();
@@ -523,7 +523,7 @@ class SimRouter extends Thread {
 					else {
 						temps = "Received Packet: " + p.getString();
 						System.out.println(temps);
-						gui.updateGUI(temps);
+						//gui.updateGUI(temps);
 						// NextHop nextHop=rTable.getNextHop(dst);
 						NextHop nextHop = rProto.getNextHop(dst);
 
@@ -532,7 +532,7 @@ class SimRouter extends Thread {
 						if (nextHop == null) {// unreachable
 							temps = "Destination Unreachable";
 							System.out.println(temps);
-							gui.updateGUI(temps);
+							//gui.updateGUI(temps);
 							String text = "Destination Unreachable";
 							Packet rep = new Packet(
 									interfaces[interfaceId].getIpAddress(),
@@ -551,7 +551,7 @@ class SimRouter extends Thread {
 								dstMac = getMacFromArpTable(p.getSrcIp());
 								System.out.println("Reply to: "
 										+ p.getSrcIp());
-								gui.updateGUI("Reply To: " + p.getSrcIp()+"  message:="+text);
+								//gui.updateGUI("Reply To: " + p.getSrcIp()+"  message:="+text);
 								if (dstMac >= 0) {
 									temp = new ByteArray(
 											(rep.getBytes()).length + 1);
@@ -574,7 +574,7 @@ class SimRouter extends Thread {
 								} else {
 									temps = "MAC not found in ARP Table; Dropping Packet";
 									System.out.println(temps);
-									gui.updateGUI(temps);
+									//gui.updateGUI(temps);
 
 								}
 							}
@@ -588,7 +588,7 @@ class SimRouter extends Thread {
 									.getIpAddress()).sameIp(nextHop.getIp())) {
 								temps = "\tShowing Packet: " + p.getString();
 								System.out.println(temps);
-								gui.updateGUI(temps);
+							//	gui.updateGUI(temps);
 								String text = "Reply from router.";
 								Packet rep = new Packet(
 										interfaces[interfaceId].getIpAddress(),
@@ -596,7 +596,7 @@ class SimRouter extends Thread {
 								dstMac = getMacFromArpTable(p.getSrcIp());
 								System.out.println("Reply to: "
 										+ nextHop.getIp()+"  message:="+text);
-								gui.updateGUI("Reply To: " + nextHop.getIp());
+								//gui.updateGUI("Reply To: " + nextHop.getIp());
 								if (dstMac >= 0) {
 									temp = new ByteArray(
 											(rep.getBytes()).length + 1);
@@ -607,7 +607,7 @@ class SimRouter extends Thread {
 								} else {
 									temps = "MAC not found in ARP Table; Dropping Packet";
 									System.out.println(temps);
-									gui.updateGUI(temps);
+									//gui.updateGUI(temps);
 
 								}
 							}
@@ -617,7 +617,7 @@ class SimRouter extends Thread {
 								temps="Routing Packet: "
 										+ p.getString();
 								System.out.println(temps);
-								gui.updateGUI(temps);
+								//gui.updateGUI(temps);
 								dstMac = getMacFromArpTable(nextHop.getIp());
 								temp = new ByteArray((p.getBytes()).length + 1);
 								temp.setByteVal(0, (byte) dstMac);
@@ -636,20 +636,20 @@ class SimRouter extends Thread {
 	}
 
 	public void WriteRTableInGUI(String row) {
-		gui.writeRoutingTable(row);
+		//gui.writeRoutingTable(row);
 	}
 
 	// ----------------------------------------------------------
 	public static void main(String args[]) throws Exception {
-		String deviceId = "R1";
+		String deviceId = "R3";
 
 		int argCount = args.length;
 		if (argCount > 0)
 			deviceId = args[0];
 
 		// GUIRouter ui=new GUIRouter(deviceId);
-		gui.setVisible(true);
-		gui.setSize(500, 500);
+		//gui.setVisible(true);
+		//gui.setSize(500, 500);
 		// gui.writeRoutingTable();
 
 		SimRouter simrouter = new SimRouter(deviceId);

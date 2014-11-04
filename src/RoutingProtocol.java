@@ -90,23 +90,27 @@ class RoutingProtocol extends Thread{
 	}	
 	
 	//-------------------Routing Protocol Thread--------------------------------------	
-	public void run(){
+	public synchronized void run(){
 		//To Do 1: Populate Routing Table with directly connected interfaces using the SimRouter instance. Also print this initial routing table	.	
 		int count=simrouter.interfaceCount;
 		System.out.println("count" +count);
 		for(int i=1;i<=count;i++)
 		{
-			long id=i;
-			int subnetMask=simrouter.interfaces[i].getSubnetMask();
-			IpAddress ipAddress=simrouter.interfaces[i].getIpAddress();
-			String networkadd=ipAddress.getNetworkAddress(subnetMask).getString();
-			RouterTableRow rtRow=new RouterTableRow(id,networkadd,"","C",ipAddress.getString(),true);
-			routingTable.add(rtRow);
+			if(simrouter.interfaces[i].isConfigured)
+			{
+				long id=i;
+				int subnetMask=simrouter.interfaces[i].getSubnetMask();
+				
+				IpAddress ipAddress=simrouter.interfaces[i].getIpAddress();
+				String networkadd=ipAddress.getNetworkAddress(subnetMask).getString();
+				RouterTableRow rtRow=new RouterTableRow(id,networkadd,"","C",ipAddress.getString(),true);
+				routingTable.add(rtRow);
+			}
 			
 		}
 		//printing routing table in console
 		System.out.println("Printing Routing Table.....");
-		for(int i=0;i<count;i++)
+		for(int i=0;i<routingTable.size();i++)
 		{
 			String row="Network: "+routingTable.get(i).getNetwork()+" Port: "+routingTable.get(i).getPort()+" Type: " + routingTable.get(i).type;
 			System.out.println(row);

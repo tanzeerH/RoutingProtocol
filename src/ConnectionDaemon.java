@@ -1,5 +1,6 @@
 import java.net.*;
 import java.io.*;
+import java.security.GuardedObject;
 import java.util.*;
 
 /**
@@ -11,7 +12,8 @@ class ConnectionDaemon extends Thread {
 	public int cCount;
 	private GUIMain guiMain;
 	public ArrayList<String> startedDevies = new ArrayList<String>();
-
+	private ArrayList<SimHost> hostList=new ArrayList<SimHost>();
+	private ArrayList<SimRouter> routertList=new ArrayList<SimRouter>();
 	// ---The followings are required if we want emulate noise in the medium
 	public static double DROP_RATE = 0.0;
 	public static double ERROR_RATE = 0.0;
@@ -50,6 +52,13 @@ class ConnectionDaemon extends Thread {
 		System.out.println("Inside Connection Daemon Constructor...");
 		start();
 	}
+	public ConnectionDaemon(GUIMain gui) {
+		this.guiMain=gui;
+		connections = new Hashtable();
+		mappings = new Hashtable();
+		System.out.println("Inside Connection Daemon Constructor...");
+		start();
+	}
 
 	// =======================================================
 	public void run() {
@@ -81,21 +90,35 @@ class ConnectionDaemon extends Thread {
 				mappings.put(oneEnd, otherEnd); // can be done using single
 												// entry
 				mappings.put(otherEnd, oneEnd);
+				startDeviceById(oneEnd);
+				startDeviceById(otherEnd);
 			}
 		}
 	}
-
-	private void startDevices(String dId) {
-		if (!startedDevies.contains(dId)) {
-			if (dId.contains("R")) {
-
-			} else if (dId.contains("H")) {
-				SimHost simHost=new SimHost(dId);
-			}
+	public ArrayList<SimHost> getSimHostList()
+	{
+		return this.hostList;
+	}
+	public ArrayList<SimRouter> getRouterList()
+	{
+		return this.routertList;
+	}
+	private void startDeviceById(String dId) {
+		if (dId.contains("H") && !startedDevies.contains(dId)) {
+			SimHost simHost = new SimHost(dId);
+			hostList.add(simHost);
 			startedDevies.add(dId);
-
 		}
-		
+		if (dId.contains("R")) {
+			String[] tokens = dId.split("-");
+			if (!startedDevies.contains(tokens[0])){
+				if (tokens.length > 1) {
+					SimRouter simRouter = new SimRouter(tokens[0]);
+					routertList.add(simRouter);
+					startedDevies.add(tokens[0]);
+				}
+			}
+		}
 
 	}
 
@@ -103,15 +126,12 @@ class ConnectionDaemon extends Thread {
 	synchronized public void registerConnection(String deviceId, Connection c) {
 		connections.put(deviceId, c);
 		System.out.println("Connections Registered For " + deviceId);
-		guiMain.setDevicesOnUI(deviceId);
-
 		// check if other end is already registered
 		String otherEnd = (String) mappings.get(deviceId);
 		Connection o = (Connection) connections.get(otherEnd);
 		if (o != null)
 			System.out.println(deviceId + " connected to " + otherEnd);
 	}
-
 	// ---------Function used to send data from one end to another--------------
 	public void sendData(String deviceId, byte[] term) {
 		Connection c = (Connection) connections.get(deviceId);
