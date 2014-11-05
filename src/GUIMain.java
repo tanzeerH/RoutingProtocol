@@ -189,7 +189,7 @@ public class GUIMain extends JFrame {
 			
 			int num = simRouter.interfaceCount;
 			for (int i = 1; i <=num; i++) {
-				if (simRouter.interfaces[i]!=null) {
+				if (simRouter.interfaces[i]!=null && simRouter.interfaces[i].isConfigured) {
 					long Id = simRouter.interfaces[i].interfaceId;
 					boolean status = simRouter.interfaces[i].getPortStatus();
 					jbox = new JCheckBox("" + Id, status);

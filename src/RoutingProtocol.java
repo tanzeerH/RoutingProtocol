@@ -1,6 +1,7 @@
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Timer;
 
 /**
@@ -12,7 +13,8 @@ class RoutingProtocol extends Thread {
 	 */
 	SimRouter simrouter;
 
-	MyTimer updateTimer;
+	TimerClass updateTimer;
+	TimerClass invalidateTimer;
 	/**
 	 * update timer duration
 	 */
@@ -21,11 +23,13 @@ class RoutingProtocol extends Thread {
 	/**
 	 * invalidate timer duration
 	 */
-	public static int INVALID_TIMER_VALUE = 90;
+	public static int INVALID_TIMER_VALUE = 40;
 
 	// To Do: Declare any other variables required
 	// ----------------------------------------------------------------------------------------------
 	public ArrayList<RouterTableRow> routingTable = new ArrayList<RoutingProtocol.RouterTableRow>();
+	//public ArrayList<TimerClass> invTimerList=new ArrayList<TimerClass>();
+	private HashMap<String,TimerClass> hashTimer=new HashMap<String, TimerClass>();
 
 	/**
 	 * @param s
@@ -47,7 +51,7 @@ class RoutingProtocol extends Thread {
 	public RoutingProtocol(SimRouter s) {
 		simrouter = s;
 		// To Do: Do other required initialization tasks.
-		updateTimer = new MyTimer(this, 1);
+		updateTimer = new TimerClass(this, 1);
 		start();
 	}
 
@@ -102,7 +106,7 @@ class RoutingProtocol extends Thread {
 		// interface is down, remove from routing table
 		if (status == false) {
 			simrouter.interfaces[interfaceId].setPortStatus(status);
-			routingTable.get(interfaceId - 1).setPortStatus(false);
+			setPortStatus(interfaceId, status);
 			IpAddress ipAddress = simrouter.interfaces[interfaceId].getIpAddress();
 			int mask = simrouter.interfaces[interfaceId].subnetMask;
 			String networkadd = ipAddress.getNetworkAddress(mask).getString();
@@ -124,7 +128,7 @@ class RoutingProtocol extends Thread {
 				for (int k = 0; k < routingTable.size(); k++) {
 					if (rowToBeDelete.equals(routingTable.get(k).getNetwork())) {
 						routingTable.remove(k);
-						System.out.println("deleting.....");
+						System.out.println("deleting....."+rowToBeDelete);
 						break;
 					}
 				}
@@ -141,6 +145,18 @@ class RoutingProtocol extends Thread {
 			routingTable.add(rtRow);
 		}
 
+	}
+	private void setPortStatus(int interfaceId, boolean status)
+	{
+		int count=routingTable.size();
+		for(int i=0;i<count;i++)
+		{
+			if(routingTable.get(i).getPort()==interfaceId && routingTable.get(i).getNextHopCount()==0 )
+			{
+				routingTable.get(i).setPortStatus(status);
+				break;
+			}
+		}
 	}
 
 	// ---------------------Forwarding
@@ -189,6 +205,10 @@ class RoutingProtocol extends Thread {
 				String networkadd = ipAddress.getNetworkAddress(subnetMask).getString();
 				RouterTableRow rtRow = new RouterTableRow(id, networkadd, "", "C", ipAddress.getString(), 0, true,
 						subnetMask);
+				invalidateTimer=new TimerClass(this,2);
+				invalidateTimer.startTimer(INVALID_TIMER_VALUE);
+				invalidateTimer.setNet(networkadd);
+				hashTimer.put(networkadd,invalidateTimer );
 				routingTable.add(rtRow);
 			}
 
@@ -387,7 +407,29 @@ class RoutingProtocol extends Thread {
 						String type = "N";
 						int h = hopes + 1;
 						nRow = new RouterTableRow(port, network, nextHop, type, "", h, true, mask);
-
+						invalidateTimer=new TimerClass(this,2);
+						invalidateTimer.setNet(networkAdress);
+						invalidateTimer.startTimer(INVALID_TIMER_VALUE);
+						if(hashTimer.get(networkAdress)!=null)
+						{
+							hashTimer.get(networkAdress).stopTimer();
+						}
+						hashTimer.remove(networkAdress);
+						hashTimer.put(networkAdress,invalidateTimer);
+					}
+					else if(pHopes==(hopes+1))
+					{
+						System.out.println("network Adress: "+networkAdress);
+						invalidateTimer=new TimerClass(this,2);
+						invalidateTimer.setNet(networkAdress);
+						invalidateTimer.startTimer(INVALID_TIMER_VALUE);
+						if(hashTimer.get(networkAdress)!=null)
+						{
+							hashTimer.get(networkAdress).stopTimer();
+						}
+						hashTimer.remove(networkAdress);
+						hashTimer.put(networkAdress,invalidateTimer);
+						
 					}
 					flag = 0;
 
@@ -408,12 +450,19 @@ class RoutingProtocol extends Thread {
 						hopes + 1, true, mask);
 				routingTable.add(row);
 				System.out.println("Routing Table altered");
+				invalidateTimer=new TimerClass(this,2);
+				invalidateTimer.startTimer(INVALID_TIMER_VALUE);
+				invalidateTimer.setNet(row.getNetwork());
+				hashTimer.put(row.getNetwork(),invalidateTimer);
+				
+				System.out.println("Hashing Network: "+ row.getNetwork());
+				
+				
 				}
 
 			}
 
 		}
-		// filterTable(b); // hasan
 		printRoutingTable();
 
 	}
@@ -441,7 +490,7 @@ class RoutingProtocol extends Thread {
 	 *            of timer: type 1- update timer and type 2- invalid timer
 	 *            expired
 	 */
-	public void handleTimerEvent(int type, int interfceid) {
+	public void handleTimerEvent(int type, String netWork) {
 		// If update timer has expired, then:
 		// To Do 1: Sent routing update to all the interfaces. Use
 		// simrouter.sendPacketToInterface(update, interfaceId) function to send
@@ -450,7 +499,7 @@ class RoutingProtocol extends Thread {
 		// To Do 2: Start the update timer again.
 		if (type == 1) {
 			sendRoutingUpdate();
-			updateTimer = new MyTimer(this, 1);
+			updateTimer = new TimerClass(this, 1);
 			updateTimer.startTimer(UPDATE_TIMER_VALUE);
 		}
 		// Else an invalid timer has expired, then:
@@ -458,11 +507,29 @@ class RoutingProtocol extends Thread {
 		// has expired.
 		else {
 			System.out.println("\t Invalid Timer Happens ");
-			notifyPortStatusChange(interfceid, false);
+			deleteRIPinRoutingTable(netWork);
+			//notifyPortStatusChange(interfceid, false);
 			// printRoutingTable_new();
 		}
 	}
 
+	private void deleteRIPinRoutingTable(String netAddress)
+	{
+		int count=routingTable.size();
+		for(int i=0;i<count;i++)
+		{
+			String tempNet=routingTable.get(i).getNetwork();
+			int h=routingTable.get(i).getNextHopCount();
+			if(tempNet.equals(netAddress) && h!=0)
+			{
+				routingTable.remove(i);
+				hashTimer.remove(netAddress);
+				System.out.println("Invalidate Timer: "+ netAddress);
+				break;
+			}
+			
+		}
+	}
 	private ByteArray getRoutingTable() {
 		int length = routingTable.size();
 
@@ -488,19 +555,6 @@ class RoutingProtocol extends Thread {
 		}
 		return byteArray;
 
-	}
-
-	public void handleTimerEvent(int type) {
-		// If update timer has expired, then:
-		// To Do 1: Sent routing update to all the interfaces. Use
-		// simrouter.sendPacketToInterface(update, interfaceId) function to send
-		// the updates.
-		// To Do Optional 1: Implement split horizon rule while sending update
-		// To Do 2: Start the update timer again.
-
-		// Else an invalid timer has expired, then:
-		// To Do 3: Delete route from routing table for which invalidate timer
-		// has expired.
 	}
 
 	// ----------------------------------------------------------------------------------------------
