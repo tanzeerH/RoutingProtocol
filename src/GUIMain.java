@@ -1,4 +1,5 @@
 import java.awt.Button;
+import java.awt.Checkbox;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -7,6 +8,7 @@ import java.io.FileReader;
 import java.util.ArrayList;
 
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
@@ -14,6 +16,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 
 import org.omg.CORBA.TCKind;
+import org.omg.CosNaming.NamingContextExtPackage.AddressHelper;
 
 public class GUIMain extends JFrame {
 	private JButton btn;
@@ -56,9 +59,8 @@ public class GUIMain extends JFrame {
 				System.out.println(dId + " clicked");
 				if (dId.contains("H"))
 					getHostInfoById(dId);
-				else if (dId.contains("R"))
-				{
-					String[]tokens=dId.split("-");
+				else if (dId.contains("R")) {
+					String[] tokens = dId.split("-");
 					getRouterInfoById(tokens[0]);
 				}
 			}
@@ -169,18 +171,54 @@ public class GUIMain extends JFrame {
 	public class RoutertUI extends JFrame {
 
 		public JTextArea txtrtTable;
+		public JCheckBox jbox;
+		public ArrayList<JCheckBox> chkList = new ArrayList<JCheckBox>();
+		public ArrayList<Long> idList = new ArrayList<Long>();
 
-		public RoutertUI(String id, SimRouter simRouter) {
+		public RoutertUI(String id, final SimRouter simRouter) {
 			super(id);
 			setLayout(new FlowLayout());
 			txtrtTable = new JTextArea(5, 40);
 			int max = simRouter.rProto.getSize();
 			for (int i = 0; i < max; i++) {
 				String str = simRouter.rProto.getRow(i);
-				txtrtTable.append("\n"+str);
+				if(!str.equals(""))
+					txtrtTable.append("\n" + str);
 			}
 			add(new JScrollPane(txtrtTable));
+			
+			int num = simRouter.interfaceCount;
+			for (int i = 1; i <=num; i++) {
+				if (simRouter.interfaces[i]!=null) {
+					long Id = simRouter.interfaces[i].interfaceId;
+					boolean status = simRouter.interfaces[i].getPortStatus();
+					jbox = new JCheckBox("" + Id, status);
+					jbox.addActionListener(new ActionListener() {
+
+						@Override
+						public void actionPerformed(ActionEvent e) {
+
+							for (int x = 0; x < chkList.size(); x++) {
+
+								if (e.getSource() == chkList.get(x)) {
+									System.out.println("" + idList.get(x)+"status"+ chkList.get(x).isSelected());
+									int id=idList.get(x).intValue();
+									simRouter.rProto.notifyPortStatusChange(id,chkList.get(x).isSelected());
+									
+								}
+							}
+
+						}
+					});
+					chkList.add(jbox);
+					idList.add(Id);
+					add(jbox);
+				}
+
+			}
+			
 
 		}
+
 	}
 }

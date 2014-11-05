@@ -506,6 +506,7 @@ class SimRouter extends Thread {
 
 				Packet p = new Packet(b.getAt(1, b.getSize() - 1));
 				IpAddress dst = p.getDstIp();
+				
 
 				int dstMac;
 				ByteArray temp;
@@ -518,7 +519,7 @@ class SimRouter extends Thread {
 
 					// 1. Check if it is a route update packet
 					if (dst.sameIp(new IpAddress(RP_MULTICAST_ADDRESS))) {
-						rProto.notifyRouteUpdate(new ByteArray(p.getBytes()));
+						rProto.notifyRouteUpdate(new ByteArray(p.getBytes()),interfaceId);
 					}
 
 					// 2. else if it is data packet, then route

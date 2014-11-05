@@ -231,6 +231,7 @@ class SimHost{
 				e.printStackTrace();
 			}
 		}
+		
 	}
 	
 	/**
@@ -253,7 +254,7 @@ class SimHost{
 	
 	
 	public static void main(String args[]) throws Exception{					
-		String deviceId="H2";
+		String deviceId="H1";
 		
 		int argCount=args.length;		
 		if (argCount>0)deviceId=args[0];

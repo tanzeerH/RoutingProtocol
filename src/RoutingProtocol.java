@@ -60,10 +60,12 @@ class RoutingProtocol extends Thread {
 	 * @param p
 	 *            ByteArray
 	 */
-	void notifyRouteUpdate(ByteArray p) {// invoked by SimRouter
+	long port = -1;
+
+	void notifyRouteUpdate(ByteArray p, long pId) {// invoked by SimRouter
 		// Write code to just to stores the route update data; do not process at
 		// this moment, otherwise the simrouter thread will get blocked
-
+		port = pId;
 		System.out.println("Route Update code");
 		try {
 			synchronized (updateBuffer) {
@@ -98,7 +100,47 @@ class RoutingProtocol extends Thread {
 		// To Do: Update the routing table according to the changed status of an
 		// interface. If interface in UP (status=TRUE), add to routing table, if
 		// interface is down, remove from routing table
-		routingTable.get(interfaceId - 1).setPortStatus(status);
+		if (status == false) {
+			simrouter.interfaces[interfaceId].setPortStatus(status);
+			routingTable.get(interfaceId - 1).setPortStatus(false);
+			IpAddress ipAddress = simrouter.interfaces[interfaceId].getIpAddress();
+			int mask = simrouter.interfaces[interfaceId].subnetMask;
+			String networkadd = ipAddress.getNetworkAddress(mask).getString();
+
+			ArrayList<String> toBdelList = new ArrayList<String>();
+			for (int i = 0; i < routingTable.size(); i++) {
+				String nhIp = routingTable.get(i).getNextHop();
+				IpAddress tIpAddress = new IpAddress(nhIp);
+				int subnet = routingTable.get(i).getSubnet();
+				String tempNetwork = tIpAddress.getNetworkAddress(subnet).getString();
+				System.out.println("network: " + networkadd + " tep net: " + tempNetwork);
+				if (tempNetwork.equals(networkadd)) {
+					// routingTable.remove(i);
+					toBdelList.add(routingTable.get(i).getNetwork());
+				}
+			}
+			for (int j = 0; j < toBdelList.size(); j++) {
+				String rowToBeDelete = toBdelList.get(j);
+				for (int k = 0; k < routingTable.size(); k++) {
+					if (rowToBeDelete.equals(routingTable.get(k).getNetwork())) {
+						routingTable.remove(k);
+						System.out.println("deleting.....");
+						break;
+					}
+				}
+			}
+		} else {
+			simrouter.interfaces[interfaceId].setPortStatus(status);
+			long id = interfaceId;
+			int subnetMask = simrouter.interfaces[interfaceId].getSubnetMask();
+
+			IpAddress ipAddress = simrouter.interfaces[interfaceId].getIpAddress();
+			String networkadd = ipAddress.getNetworkAddress(subnetMask).getString();
+			RouterTableRow rtRow = new RouterTableRow(id, networkadd, "", "C", ipAddress.getString(), 0, true,
+					subnetMask);
+			routingTable.add(rtRow);
+		}
+
 	}
 
 	// ---------------------Forwarding
@@ -117,11 +159,14 @@ class RoutingProtocol extends Thread {
 		// To Do: Write code that returns an NextHop object corresponding the
 		// destination IP Address: dstIP. If route in unknown, return null
 
-		String network = dstIp.getNetworkAddress(receivedPortMask).getString();
 		for (int i = 0; i < routingTable.size(); i++) {
+			int mask = routingTable.get(i).getSubnet();
+			String network = dstIp.getNetworkAddress(mask).getString();
 			System.out.println(dstIp.getString());
-			if (routingTable.get(i).getIP().equals(dstIp.getString())) {
-				NextHop nH = new NextHop(dstIp, (int) routingTable.get(i).getPort());
+			if (routingTable.get(i).getNetwork().equals(network)) {
+				NextHop nH = new NextHop(new IpAddress(routingTable.get(i).getNextHop()), (int) routingTable.get(i)
+						.getPort());
+				System.out.println("next Hop IP" + routingTable.get(i).getNextHop());
 				return nH;
 			}
 		}
@@ -237,14 +282,17 @@ class RoutingProtocol extends Thread {
 	}
 
 	public String getRow(int i) {
-		String row = "Network: " + routingTable.get(i).getNetwork() + " Port: " + routingTable.get(i).getPort()
-				+ " Type: " + routingTable.get(i).type + "NextHop: " + routingTable.get(i).nextHop + " Hope Count: "
-				+ routingTable.get(i).getNextHopCount();
-		System.out.println(row);
+		String row = "";
+		if (routingTable.get(i).getPortStatus()) {
+			row = "Network: " + routingTable.get(i).getNetwork() + " Port: " + routingTable.get(i).getPort()
+					+ " Type: " + routingTable.get(i).type + "NextHop: " + routingTable.get(i).nextHop
+					+ " Hope Count: " + routingTable.get(i).getNextHopCount();
+			System.out.println(row);
+		}
 		return row;
 	}
 
-	private void checkReceivedRoutingData(ByteArray b) {
+	private void filterTable(ByteArray b) {
 		Packet p = new Packet(b.getBytes());
 		byte addr[] = new byte[4];
 		int items = (p.payload.length) / 6;
@@ -253,16 +301,75 @@ class RoutingProtocol extends Thread {
 		int mask;
 		IpAddress address;
 		IpAddress srcAddrss = p.getSrcIp();
+		ArrayList<String> toBdelList = new ArrayList<String>();
+		// System.out.println("************************************** :");
+		for (int a = 0; a < routingTable.size(); a++) {
+			if (routingTable.get(a).getNextHop().equals(srcAddrss.getString())) {
+				boolean isInUpdatePacket = false;
+				RouterTableRow tempRow = routingTable.get(a);
+				String networkId = tempRow.getNetwork();
+				for (int i = 1; i <= items; i++) {
+					System.arraycopy(p.payload, index, addr, 0, addr.length);
+					index += 4;
+					hopes = (int) p.payload[index];
+					++index;
+					mask = (int) p.payload[index];
+					++index;
+					address = new IpAddress(addr);
+					System.out.println("address: " + address.getString() + " mask " + mask + " hopes:" + hopes);
+
+					if (networkId.equals(address.getNetworkAddress(mask))) {
+						isInUpdatePacket = true;
+						System.out.println("hasan u value of isInUpdatePacket :" + isInUpdatePacket);
+					}
+				}
+				if (isInUpdatePacket == false) {
+					// add to delete list
+					toBdelList.add(networkId);
+					System.out.println("hasan u need to delete networkId :" + networkId);
+				}
+			}
+		}
+		// delete Now
+		for (int j = 0; j < toBdelList.size(); j++) {
+			String rowToBeDelete = toBdelList.get(j);
+			for (int k = 0; k < routingTable.size(); k++) {
+				if (rowToBeDelete.equals(routingTable.get(k).getNetwork())) {
+					routingTable.remove(k);
+				}
+			}
+		}
+
+	}
+
+	private void checkReceivedRoutingData(ByteArray b) {
+		Packet p = new Packet(b.getBytes());
+		byte addr[] = new byte[4];
+		byte nextHopAddr[] = new byte[4];
+		int items = (p.payload.length) / 10;
+		int index = 0;
+		int hopes;
+		int mask;
+		IpAddress address;
+		IpAddress nAddress;
+		IpAddress srcAddrss = p.getSrcIp();
 
 		for (int i = 1; i <= items; i++) {
 			System.arraycopy(p.payload, index, addr, 0, addr.length);
 			index += 4;
 			hopes = (int) p.payload[index];
-			++index;
+			index++;
 			mask = (int) p.payload[index];
-			++index;
+			index++;
 			address = new IpAddress(addr);
-			System.out.println("address: " + address.getString() + " mask " + mask + " hopes:" + hopes);
+			System.arraycopy(p.payload, index, nextHopAddr, 0, nextHopAddr.length);
+			index += 4;
+
+			nAddress = new IpAddress(nextHopAddr);
+
+			System.out.println("address: " + address.getString() + " mask " + mask + " hopes:" + hopes + "  Next Hop: "
+					+ nAddress.getString());
+
 			int num = routingTable.size();
 			int flag = 1;
 			int uFlag = -1;
@@ -274,7 +381,7 @@ class RoutingProtocol extends Thread {
 					int pHopes = rRow.getNextHopCount();
 					if (pHopes > (hopes + 1)) {
 						uFlag = j;
-						long port = rRow.getPort();
+						// long port = rRow.getPort();
 						String network = rRow.getNetwork();
 						String nextHop = srcAddrss.getString();
 						String type = "N";
@@ -291,15 +398,38 @@ class RoutingProtocol extends Thread {
 				routingTable.add(nRow);
 			}
 			if (flag == 1) {
-				RouterTableRow row = new RouterTableRow(0, address.getString(), srcAddrss.getString(), "N", "", hopes+1,
-						true, mask);
+				if(isDirectylyConnected(nAddress.getString()))
+				{
+					System.out.println("From Directly Connected Interface: "+nAddress.getString());
+				}
+				else
+				{
+				RouterTableRow row = new RouterTableRow(port, address.getString(), srcAddrss.getString(), "N", "",
+						hopes + 1, true, mask);
 				routingTable.add(row);
 				System.out.println("Routing Table altered");
+				}
+
 			}
 
 		}
+		// filterTable(b); // hasan
 		printRoutingTable();
 
+	}
+
+	private boolean isDirectylyConnected(String portIp) {
+		int count = simrouter.interfaceCount;
+		System.out.println("count" + count);
+		for (int i = 1; i <= count; i++) {
+			if (simrouter.interfaces[i].isConfigured) {
+				if (simrouter.interfaces[i].getIpAddress().getString().equals(portIp))
+					return true;
+
+			}
+
+		}
+		return false;
 	}
 
 	// ----------------------Timer
@@ -336,16 +466,24 @@ class RoutingProtocol extends Thread {
 	private ByteArray getRoutingTable() {
 		int length = routingTable.size();
 
-		ByteArray byteArray = new ByteArray(length * 6);
+		ByteArray byteArray = new ByteArray(length * 10);
 		int start = 0;
 		for (int i = 0; i < length; i++) {
 			// System.out.println(""+start);
 			byteArray.setAt(start, new IpAddress(routingTable.get(i).getNetwork()).getBytes());
 			start = start + 4;
-			byteArray.setByteVal(start, (byte) routingTable.get(i).getNextHopCount());
+			// next Hope Count=-1 if status=false
+			if (routingTable.get(i).getPortStatus())
+				byteArray.setByteVal(start, (byte) routingTable.get(i).getNextHopCount());
+			else {
+				System.out.println("hopes -1 send");
+				byteArray.setByteVal(start, (byte) -1);
+			}
 			start = start + 1;
 			byteArray.setByteVal(start, (byte) routingTable.get(i).getSubnet());
 			start = start + 1;
+			byteArray.setAt(start, new IpAddress(routingTable.get(i).getNextHop()).getBytes());
+			start = start + 4;
 
 		}
 		return byteArray;
