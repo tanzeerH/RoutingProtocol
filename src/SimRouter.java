@@ -300,6 +300,7 @@ class SimRouter extends Thread {
 	 * routing protocol
 	 */
 	RoutingProtocol rProto;
+	String deviceId;
 	/**
 	 * memory size
 	 */
@@ -317,6 +318,7 @@ class SimRouter extends Thread {
 	//static GUIRouter gui = new GUIRouter("Router");
 
 	public SimRouter(String deviceId) {
+		this.deviceId=deviceId;
 		rMemory = new Buffer<ByteArray>("Router Memory", MEMORY_SIZE);
 		arpTable = new Hashtable();
 
@@ -634,7 +636,10 @@ class SimRouter extends Thread {
 			e.printStackTrace();
 		}
 	}
-
+	public void printOnUI(GUIMain gui)
+	{
+		
+	}
 	public void WriteRTableInGUI(String row) {
 		//gui.writeRoutingTable(row);
 	}

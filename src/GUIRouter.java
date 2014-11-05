@@ -30,7 +30,6 @@ public class GUIRouter  extends JFrame{
 		add(lblarea);
 		add(new JScrollPane(txtHints));
 	}
-		
 	public void writeRoutingTable(String txt)
 	{
 		txtrtTable.append(txt+"\n");
